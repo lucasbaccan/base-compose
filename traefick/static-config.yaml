@@ -1,0 +1,87 @@
+# https://doc.traefik.io/traefik/contributing/data-collection/
+global:
+  sendAnonymousUsage: true
+
+# https://doc.traefik.io/traefik/operations/dashboard/
+api:
+  dashboard: true
+  insecure: false
+
+# https://doc.traefik.io/traefik/providers/overview/
+providers:
+  # https://doc.traefik.io/traefik/providers/docker/
+  docker:
+    endpoint: "unix:///var/run/docker.sock"
+    exposedByDefault: false
+    watch: true
+
+  # https://doc.traefik.io/traefik/providers/file/
+  file:
+    filename: /etc/traefik/dynamic.yaml
+    watch: true
+
+# https://doc.traefik.io/traefik/observability/logs/
+log:
+  # filePath: /var/log/traefik/traefik.log # Not working and creash the container
+  level: DEBUG
+  format: common
+  maxSize: 100 # Size in
+  maxBackups: 3 # Number of backups to keep
+
+# https://doc.traefik.io/traefik/routing/entrypoints/
+entryPoints:
+  # Non-secure entry point
+  http:
+    address: ":80"
+    http:
+      redirections:
+        entryPoint:
+          to: https
+          scheme: https
+
+  # Secure entry point
+  https:
+    address: ":443"
+    http:
+      tls:
+        certResolver: letsencryptResolver
+    transport:
+      respondingTimeouts:
+        readTimeout: 300s # 5 minutes
+        writeTimeout: 0s # 0 seconds
+        idleTimeout: 180s # 3 minutes
+
+  # Metrics entry point - Not exposed
+  metrics:
+    address: ":8080"
+
+# https://doc.traefik.io/traefik/https/acme/
+certificatesResolvers:
+  letsencryptResolver:
+    acme:
+      caserver: "https://acme-staging-v02.api.letsencrypt.org/directory" # Let's Encrypt staging
+      email: "naccabbaccan@hotmail.com"
+      storage: "/letsencrypt/acme.json"
+      httpChallenge:
+        entryPoint: "http"
+
+# Plugins - https://plugins.traefik.io/install
+experimental:
+  plugins:
+    # https://plugins.traefik.io/plugins/6715d1d37dd5a6c3095befd4/sablier
+    sablier:
+      moduleName: "github.com/sablierapp/sablier"
+      version: "v1.8.1"
+
+# https://doc.traefik.io/traefik/observability/metrics/overview/
+# https://doc.traefik.io/traefik/observability/metrics/prometheus/
+metrics:
+  prometheus:
+    addEntryPointsLabels: true
+    addServicesLabels: true
+    buckets:
+      - 0.1
+      - 0.3
+      - 1.2
+      - 5.0
+    entryPoint: metrics

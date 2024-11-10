@@ -1,0 +1,192 @@
+# Name of the compose
+name: base-compose
+
+# Services
+services:
+  # Reverse proxy - Traefik
+  traefik:
+    image: traefik:v3.2.0
+    container_name: traefik
+    networks:
+      - traefick
+    ports:
+      # HTTP
+      - "80:80"
+      # HTTPS
+      - "443:443"
+      # Metrics - Prometheus - Private
+      # - "8080:8080"
+    volumes:
+      # Map the docker socket into the container
+      - "/var/run/docker.sock:/var/run/docker.sock"
+      # Map the static configuration into the container
+      - ./traefick/static-config.yaml:/etc/traefik/traefik.yaml:ro
+      # Map the dynamic configuration into the container
+      - ./traefick/dynamic-config.yaml:/etc/traefik/dynamic.yaml:ro
+      # Map the certificats into the container
+      # This is a volume, because the permissions are not the same
+      - traefick-letsencrypt:/letsencrypt
+    environment:
+      - BASE_URL=${BASE_URL}
+    deploy:
+      resources:
+        limits:
+          cpus: "1"
+          memory: "150m"
+
+  # Sablier plugin for Traefik
+  # https://github.com/sablierapp/sablier
+  sablier:
+    image: sablierapp/sablier:1.8.1
+    container_name: traefik-sablier
+    networks:
+      - traefick
+    command:
+      - start
+      - --provider.name=docker
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock"
+    deploy:
+      # Small ammonut of resources because it's a plugin
+      # to start/stop the containers
+      resources:
+        limits:
+          cpus: "0.01"
+          memory: "25M"
+
+  # Whoami - Test container for Traefik and load balancer example
+  whoami:
+    image: traefik/whoami
+    # image: "traefik/whoami:v1.10" # Test with a specific version
+    container_name: whoami
+    networks:
+      - traefick
+    # ports:
+    #   - "80:80"
+    labels:
+      - sablier.enable=true
+      - sablier.group=whoami
+    deploy:
+      # Small amount of resources because it's a test container
+      resources:
+        limits:
+          cpus: "0.01"
+          memory: "10m"
+      # replicas: 2 # Não funciona com o Traefik pois o DNS do docker não balança a carga
+
+  # Whoami - Test container for Traefik and load balancer example
+  whoami2:
+    image: traefik/whoami
+    # image: "traefik/whoami:v1.10" # Test with a specific version
+    container_name: whoami2
+    networks:
+      - traefick
+    # ports:
+    #   - "80:80"
+    labels:
+      - sablier.enable=true
+      - sablier.group=whoami
+    deploy:
+      # Small amount of resources because it's a test container
+      resources:
+        limits:
+          cpus: "0.01"
+          memory: "10m"
+      # replicas: 2 # Não funciona com o Traefik pois o DNS do docker não balança a carga
+      # replicas: 2
+
+  # Dozzle - Docker logs in the browser
+  # https://dozzle.dev/
+  dozzle:
+    image: amir20/dozzle:latest
+    # image: amir20/dozzle:v8.7.2 # Test with a specific version
+    container_name: dozzle
+    networks:
+      - traefick
+    # ports:
+    #   - "8080:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    deploy:
+      # Small amount of resources because it's a monitoring tool
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: "100m"
+
+  # Netdata - Monitoring tool
+  netdata:
+    image: netdata/netdata
+    # image: netdata/netdata:v2.0.0 # Test with a specific version
+    container_name: netdata
+    privileged: true
+    networks:
+      - traefick
+    # ports:
+    #   - "19999:19999"
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    cap_add:
+      - SYS_PTRACE
+    security_opt:
+      - apparmor:unconfined
+      - seccomp:unconfined
+    deploy:
+      # Small amount of resources because it's a monitoring tool
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: "150m"
+
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    container_name: prometheus
+    networks:
+      - traefick
+    # ports:
+    #   - "9090:9090"
+    volumes:
+      - ./prometheus:/etc/prometheus
+    deploy:
+      # Small amount of resources because it's a monitoring tool
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: "100m"
+
+  grafana:
+    image: grafana/grafana:11.2.0-ubuntu
+    container_name: grafana
+    networks:
+      - traefick
+    # ports:
+    #   - "3000:3000"
+    environment:
+      # GF_SECURITY_DISABLE_INITIAL_ADMIN_CREATION: "true"
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      # GF_AUTH_ANONYMOUS_ORG_ROLE: "Admin"
+      GF_AUTH_DISABLE_SIGNOUT_MENU: "true"
+      # GF_AUTH_DISABLE_LOGIN_FORM: "true"
+      GF_SECURITY_ADMIN_USER: "admin"
+      GF_SECURITY_ADMIN_PASSWORD: "admin"
+    volumes:
+      # Grafana data
+      # - grafana:/var/lib/grafana
+      # Providers
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      # Dashboards
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
+    deploy:
+      # Small amount of resources because it's a monitoring tool
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: "100m"
+
+networks:
+  traefick:
+
+volumes:
+  traefick-letsencrypt:

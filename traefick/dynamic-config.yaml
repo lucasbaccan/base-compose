@@ -1,0 +1,127 @@
+http:
+  routers:
+    traefik:
+      # More secure rule
+      # rule: Host(`traefik.{{env "BASE_URL"}}`) && (PathPrefix(`/api`) || PathPrefix(`/dashboard`))
+      # Less secure rule
+      rule: Host(`traefik.{{env "BASE_URL"}}`) || Host(`proxy.{{env "BASE_URL"}}`)
+      service: api@internal
+      entryPoints:
+        - https
+      middlewares:
+        - admin-auth
+
+    whoami:
+      rule: Host(`whoami.{{env "BASE_URL"}}`)
+      service: whoami
+      entryPoints:
+        - https
+      middlewares:
+        - sablier-whoami
+
+    dozzle:
+      rule: Host(`logs.{{env "BASE_URL"}}`) || Host(`dozzle.{{env "BASE_URL"}}`)
+      service: dozzle
+      entryPoints:
+        - https
+      middlewares:
+        - sablier-dozzle
+
+    netdata:
+      rule: Host(`netdata.{{env "BASE_URL"}}`)
+      service: netdata
+      entryPoints:
+        - https
+      middlewares:
+        - demo-auth
+
+    prometheus:
+      rule: Host(`prometheus.{{env "BASE_URL"}}`)
+      service: prometheus
+      entryPoints:
+        - https
+
+    grafana:
+      rule: Host(`grafana.{{env "BASE_URL"}}`)
+      service: grafana
+      entryPoints:
+        - https
+
+  services:
+    # Example of a weighted load balancer
+    whoami:
+      weighted:
+        services:
+          - name: whoami1
+            weight: 1
+          - name: whoami2
+            weight: 1
+    whoami1:
+      loadBalancer:
+        servers:
+          - url: http://whoami:80
+    whoami2:
+      loadBalancer:
+        servers:
+          - url: http://whoami2:80
+    # End of example
+
+    dozzle:
+      loadBalancer:
+        servers:
+          - url: http://dozzle:8080
+    netdata:
+      loadBalancer:
+        servers:
+          - url: http://netdata:19999
+    prometheus:
+      loadBalancer:
+        servers:
+          - url: http://prometheus:9090
+    grafana:
+      loadBalancer:
+        servers:
+          - url: http://grafana:3000
+
+  middlewares:
+    # Middleware for basic authentication
+    # https://hostingcanada.org/htpasswd-generator/
+    # User '* Apache specific salted MD5 (insecure but common)'
+    admin-auth:
+      basicAuth:
+        users:
+          - admin:$apr1$hvelmp5r$rnMeTYoIWQeK5Z6Pnkf40/ # admin:admin
+
+    demo-auth:
+      basicAuth:
+        users:
+          - demo:$apr1$gdbvmk1y$/SKulOkYWsnxa07ss/Nt20 # demo:demo
+          - user:$apr1$s4hfr3iz$FAbFNRfa0sQe9Hzo4oyKO. # user:user
+
+    # Middleware for start/stop containers
+    # If you user the 'name', you cant use the 'group'
+    # If you want to use the 'group', you need to add the label above
+    # labels:
+    #   - sablier.enable=true
+    #   - sablier.group=demo
+    sablier-whoami:
+      plugin:
+        sablier:
+          sablierUrl: http://sablier:10000
+          sessionDuration: 1m
+          # names: whoami
+          group: whoami
+          blocking:
+            defaultTimeout: 10s
+
+    sablier-dozzle:
+      plugin:
+        sablier:
+          sablierUrl: http://sablier:10000
+          sessionDuration: 10m
+          names: dozzle
+          dynamic:
+            displayName: dozzle
+            refreshFrequency: 5s
+            showDetails: true
+            theme: ghost
