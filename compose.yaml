@@ -185,8 +185,100 @@ services:
           cpus: "0.25"
           memory: "100m"
 
+  jenkins:
+    build:
+      context: ./jenkins
+      dockerfile: Dockerfile
+    container_name: jenkins
+    privileged: true
+    profiles:
+      - jenkins
+    user: ${UID}:${GID}
+    networks:
+      - traefick
+      - docker-proxy
+    volumes:
+      - ./jenkins/iac/casc_configs:/var/jenkins_home/casc_configs
+      - ./jenkins/jenkins_home:/var/jenkins_home
+      - ./jenkins/jenkins_jobs:/var/jenkins_home/jobs
+      - ./jenkins/jenkins_plugins:/var/jenkins_home/plugins
+    env_file:
+      - .env
+    environment:
+      - CASC_JENKINS_CONFIG=/var/jenkins_home/casc_configs
+      - NUMBER_OF_EXECUTORS=0
+      # https://github.com/jenkinsci/docker/?tab=readme-ov-file#upgrading
+      - PLUGINS_FORCE_UPGRADE=true
+      - TRY_UPGRADE_IF_NO_MARKER=true
+      # Docker Socket Proxy
+      - DOCKER_HOST=tcp://dockerproxy:2375
+      - DOCKER_OPTS="-H tcp://dockerproxy:2375"
+    deploy:
+      # Small amount of resources because it's a monitoring tool
+      resources:
+        limits:
+          cpus: "1"
+          memory: "500m"
+
+  # https://github.com/Tecnativa/docker-socket-proxy/tree/master
+  # https://docs.docker.com/reference/api/engine/version/v1.43/
+  dockerproxy:
+    image: ghcr.io/tecnativa/docker-socket-proxy:latest # Don't hava other versions
+    container_name: dockerproxy
+    privileged: true
+    profiles:
+      - jenkins
+    networks:
+      - docker-proxy
+    environment:
+      - ALLOW_RESTARTS=1
+      - ALLOW_STOP=1
+      - ALLOW_START=1
+      - AUTH=1
+      - BUILD=1
+      - COMMIT=1
+      - CONFIGS=1
+      - CONTAINERS=1
+      - DISTRIBUTION=1
+      - EVENTS=1
+      - EXEC=1
+      - GRPC=1
+      - IMAGES=1
+      - INFO=1
+      - NETWORKS=1
+      - NODES=1
+      - PING=1
+      - PLUGINS=1
+      - SECRETS=1
+      - SERVICES=1
+      - SESSION=1
+      - SWARM=1
+      - SYSTEM=1
+      - TASKS=1
+      - VERSION=1
+      - VOLUMES=1
+      # Requests
+      - POST=1
+    ports:
+      - 127.0.0.1:2375:2375
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      # New config file allowing all requests
+      # - ./docker-socket-proxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg.template
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.1"
+          memory: "25M"
+
+# Networks
 networks:
   traefick:
+    name: "traefick"
+  docker-proxy:
+    name: "docker-proxy"
 
+# Volumes
 volumes:
   traefick-letsencrypt:

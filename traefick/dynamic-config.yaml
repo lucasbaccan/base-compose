@@ -47,6 +47,12 @@ http:
       entryPoints:
         - https
 
+    jenkins:
+      rule: Host(`jenkins.{{env "BASE_URL"}}`)
+      service: jenkins
+      entryPoints:
+        - https
+
   services:
     # Example of a weighted load balancer
     whoami:
@@ -70,18 +76,26 @@ http:
       loadBalancer:
         servers:
           - url: http://dozzle:8080
+
     netdata:
       loadBalancer:
         servers:
           - url: http://netdata:19999
+
     prometheus:
       loadBalancer:
         servers:
           - url: http://prometheus:9090
+
     grafana:
       loadBalancer:
         servers:
           - url: http://grafana:3000
+
+    jenkins:
+      loadBalancer:
+        servers:
+          - url: http://jenkins:8080
 
   middlewares:
     # Middleware for basic authentication
@@ -122,6 +136,18 @@ http:
           names: dozzle
           dynamic:
             displayName: dozzle
+            refreshFrequency: 5s
+            showDetails: true
+            theme: ghost
+
+    sablier-jenkins:
+      plugin:
+        sablier:
+          sablierUrl: http://sablier:10000
+          sessionDuration: 10m
+          names: jenkins,dockerproxy
+          dynamic:
+            displayName: jenkins
             refreshFrequency: 5s
             showDetails: true
             theme: ghost

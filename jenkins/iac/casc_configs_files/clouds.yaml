@@ -1,0 +1,27 @@
+jenkins:
+  clouds:
+  - docker:
+      containerCap: 4
+      dockerApi:
+        connectTimeout: 10
+        dockerHost:
+          uri: "tcp://dockerproxy:2375"
+        hostname: "tcp://dockerproxy:2375"
+        readTimeout: 10
+      errorDuration: 10
+      exposeDockerHost: true
+      name: "docker-cloud"
+      templates:
+      - connector: "attach"
+        dockerTemplateBase:
+          cpuPeriod: 0
+          cpuQuota: 0
+          image: "jenkins/jnlp-agent-docker:latest"
+          network: "docker-proxy"
+        # instanceCapStr: "2"
+        # labelString: "dind"
+        name: "dind"
+        pullStrategy: PULL_ALWAYS
+        pullTimeout: 300
+        remoteFs: "/home/jenkins/agent"
+  

@@ -1,0 +1,4 @@
+jenkins:
+  disableRememberMe: false
+  numExecutors: ${NUMBER_OF_EXECUTORS}
+  mode: EXCLUSIVE
